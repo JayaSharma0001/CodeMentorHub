@@ -21,7 +21,7 @@ await connectCloudinary();
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://coding-ninja-two.vercel.app",
+  "https://code-mentor-hub-henna.vercel.app/",
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
