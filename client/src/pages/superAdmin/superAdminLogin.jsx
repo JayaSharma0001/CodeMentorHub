@@ -8,7 +8,7 @@ const SuperAdminLogin = () => {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (username === "shubham" && password === "shubham1234") {
+    if (username === "JayaSharma" && password === "JayaSharma1234") {
       // Login successful, redirect to /super-admin
       window.location.href = "/super-admin";
     } else {
