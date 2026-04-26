@@ -74,7 +74,7 @@ export const addCourse = async (req, res) => {
         res.json({
             success: true,
             message: usedCloudinaryFallback
-                ? 'Course Added (thumbnail saved using fallback storage)'
+                ? 'Course Added'
                 : 'Course Added'
         })
 
