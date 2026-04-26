@@ -8,8 +8,9 @@ const Footer = () => {
         <div className="flex flex-col md:items-start items-center w-full">
           <img src={assets.logo_dark} alt="logo" />
           <p className="mt-6 text-center md:text-left text-sm text-white/80">
-            Lorem Ipsum is simply dummy text of the printing and typesetting
-            industry. Lorem Ipsum has been the industry's standard dummy text.
+          CodeMentorHub is a modern Learning Management System (LMS) web application designed to sell online courses and manage digital learning efficiently.
+          Educators can easily create, upload, and manage their courses, including videos, content, and assessments.
+          Students can browse, purchase, and learn from high-quality courses through a seamless and user-friendly platform.
           </p>
         </div>
 
