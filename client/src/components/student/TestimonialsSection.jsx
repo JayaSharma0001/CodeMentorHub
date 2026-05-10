@@ -7,7 +7,7 @@ const TestimonialsSection = () => {
     <div className="pb-14 px-8 md:px-0">
       <h2 className="text-3xl font-medium text-gray-800">Testimonials</h2>
       <p className="md:text-base text-gray-500 mt-3">
-        Hear from our learners as they share their journeys of transformation, success, and how our <br /> platform has made a difference in their lives.
+      Hear from our learners and developers as they share how CodeMentorHub helped them improve their <br /> coding skills, crack interviews, and grow their tech careers.
       </p>
       <div className="grid grid-cols-auto gap-8 mt-14">
         {dummyTestimonial.map((testimonial, index) => (

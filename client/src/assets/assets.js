@@ -93,25 +93,25 @@ export const assets = {
 
 export const dummyTestimonial = [
     {
-        name: 'Donald Jackman',
-        role: 'SWE 1 @ Amazon',
+        name: 'Rahul Sharma',
+        role: 'Full Stack Developer @ Infosys',
         image: assets.profile_img_1,
         rating: 5,
-        feedback: 'I\'ve been using Imagify for nearly two years, primarily for Instagram, and it has been incredibly user-friendly, making my work much easier.',
+        feedback: 'CodeMentorHub completely changed the way I learn programming. The structured courses, live projects, and mentorship helped me land my first developer role with confidence.',
     },
     {
-        name: 'Richard Nelson',
-        role: 'SWE 2 @ Samsung',
+        name: 'Priya Verma',
+        role: 'Data Analyst @ TCS',
         image: assets.profile_img_2,
         rating: 4,
-        feedback: 'I\'ve been using Imagify for nearly two years, primarily for Instagram, and it has been incredibly user-friendly, making my work much easier.',
+        feedback: 'The SQL and Python courses on CodeMentorHub are incredibly beginner-friendly. The practical assignments and interview preparation sessions were extremely helpful.',
     },
     {
-        name: 'James Washington',
-        role: 'SWE 2 @ Google',
+        name: 'Arjun Mehta',
+        role: 'Software Engineer @ Wipro',
         image: assets.profile_img_3,
         rating: 4.5,
-        feedback: 'I\'ve been using Imagify for nearly two years, primarily for Instagram, and it has been incredibly user-friendly, making my work much easier.',
+        feedback: 'I loved the hands-on learning experience at CodeMentorHub. The mentors explain concepts clearly, and the real-world projects improved my development skills a lot.',
     },
 ];
 
