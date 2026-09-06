@@ -106,11 +106,24 @@ const AddCourse = () => {
         return;
       }
 
+      const price = Number(coursePrice);
+      const discountValue = Number(discount);
+      const finalPrice = Number(
+        (price - (discountValue * price) / 100).toFixed(2)
+      );
+
+      if (finalPrice < 50) {
+        toast.error(
+          "Course not uploaded. Final price after discount must be at least ₹50."
+        );
+        return;
+      }
+
       const courseData = {
         courseTitle,
         courseDescription: quillRef.current.root.innerHTML,
-        coursePrice: Number(coursePrice),
-        discount: Number(discount),
+        coursePrice: price,
+        discount: discountValue,
         courseContent: chapters,
         status: "pending", // add this line
       };

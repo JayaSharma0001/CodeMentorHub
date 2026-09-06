@@ -3,6 +3,7 @@ import Course from '../models/Course.js';
 import { Purchase } from '../models/Purchase.js';
 import User from '../models/User.js';
 import { clerkClient } from '@clerk/express'
+import ensureUserExists from '../utils/ensureUser.js'
 
 // update role to educator
 export const updateRoleToEducator = async (req, res) => {
@@ -10,6 +11,8 @@ export const updateRoleToEducator = async (req, res) => {
     try {
 
         const userId = req.auth.userId
+
+        await ensureUserExists(userId)
 
         await clerkClient.users.updateUserMetadata(userId, {
             publicMetadata: {
@@ -40,7 +43,23 @@ export const addCourse = async (req, res) => {
             return res.json({ success: false, message: 'Thumbnail Not Attached' })
         }
 
+        // Ensure educator exists in MongoDB so course cards can show educator.name
+        await ensureUserExists(educatorId)
+
         const parsedCourseData = JSON.parse(courseData)
+
+        const price = Number(parsedCourseData.coursePrice)
+        const discountValue = Number(parsedCourseData.discount)
+        const finalPrice = Number(
+            (price - (discountValue * price) / 100).toFixed(2)
+        )
+
+        if (finalPrice < 50) {
+            return res.json({
+                success: false,
+                message: 'Course not uploaded. Final price after discount must be at least ₹50.'
+            })
+        }
 
         parsedCourseData.educator = educatorId
         parsedCourseData.status = 'pending'

@@ -12,7 +12,7 @@ export const AppContextProvider = (props) => {
   const currency = import.meta.env.VITE_CURRENCY;
 
   const navigate = useNavigate();
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
 
   const [showLogin, setShowLogin] = useState(false);
@@ -40,11 +40,12 @@ export const AppContextProvider = (props) => {
   // Fetch UserData
   const fetchUserData = async () => {
     try {
-      if (user.publicMetadata.role === "educator") {
+      if (user?.publicMetadata?.role === "educator") {
         setIsEducator(true);
       }
 
       const token = await getToken();
+      if (!token) return;
 
       const { data } = await axios.get(backendUrl + "/api/user/data", {
         headers: { Authorization: `Bearer ${token}` },
@@ -52,7 +53,9 @@ export const AppContextProvider = (props) => {
 
       if (data.success) {
         setUserData(data.user);
-      } else toast.error(data.message);
+      } else if (data.message && data.message !== "User Not Found") {
+        toast.error(data.message);
+      }
     } catch (error) {
       toast.error(error.message);
     }
@@ -60,16 +63,23 @@ export const AppContextProvider = (props) => {
 
   // Fetch User Enrolled Courses
   const fetchUserEnrolledCourses = async () => {
-    const token = await getToken();
+    try {
+      const token = await getToken();
+      if (!token) return;
 
-    const { data } = await axios.get(
-      backendUrl + "/api/user/enrolled-courses",
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+      const { data } = await axios.get(
+        backendUrl + "/api/user/enrolled-courses",
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-    if (data.success) {
-      setEnrolledCourses(data.enrolledCourses.reverse());
-    } else toast.error(data.message);
+      if (data.success) {
+        setEnrolledCourses((data.enrolledCourses || []).reverse());
+      } else if (data.message && data.message !== "User Not Found") {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
   };
 
   // Function to Calculate Course Chapter Time
@@ -134,11 +144,15 @@ export const AppContextProvider = (props) => {
 
   // Fetch User's Data if User is Logged In
   useEffect(() => {
-    if (user) {
-      fetchUserData();
-      fetchUserEnrolledCourses();
-    }
-  }, [user]);
+    if (!isLoaded || !isSignedIn || !user) return;
+
+    const loadUser = async () => {
+      await fetchUserData();
+      await fetchUserEnrolledCourses();
+    };
+
+    loadUser();
+  }, [user, isLoaded, isSignedIn]);
 
   const value = {
     showLogin,
@@ -151,6 +165,7 @@ export const AppContextProvider = (props) => {
     getToken,
     allCourses,
     fetchAllCourses,
+    fetchUserData,
     enrolledCourses,
     fetchUserEnrolledCourses,
     calculateChapterTime,

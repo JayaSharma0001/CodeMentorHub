@@ -1,19 +1,40 @@
-import { useEffect } from "react";
+import { useContext, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@clerk/clerk-react";
+import axios from "axios";
+import { AppContext } from "../../context/AppContext";
 
 const Loading = () => {
   const { path } = useParams();
   const navigate = useNavigate();
+  const { getToken } = useAuth();
+  const { backendUrl, fetchUserEnrolledCourses } = useContext(AppContext);
 
   useEffect(() => {
-    if (path) {
-      const timer = setTimeout(() => {
-        navigate(`/${path}`);
-      }, 5000);
+    const finalizePurchase = async () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get("session_id");
+        const token = await getToken();
 
-      // Cleanup the timer on component unmount
-      return () => clearTimeout(timer);
-    }
+        if (token) {
+          await axios.post(
+            `${backendUrl}/api/user/confirm-purchase`,
+            { sessionId },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          await fetchUserEnrolledCourses();
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (path) {
+          navigate(`/${path}`);
+        }
+      }
+    };
+
+    finalizePurchase();
   }, []);
 
   return (

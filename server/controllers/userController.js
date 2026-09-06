@@ -3,6 +3,8 @@ import { CourseProgress } from "../models/CourseProgress.js"
 import { Purchase } from "../models/Purchase.js"
 import User from "../models/User.js"
 import stripe from "stripe"
+import ensureUserExists, { resolveAuthUserId } from "../utils/ensureUser.js"
+import completePurchaseEnrollment from "../utils/completePurchaseEnrollment.js"
 
 
 
@@ -10,9 +12,14 @@ import stripe from "stripe"
 export const getUserData = async (req, res) => {
     try {
 
-        const userId = req.auth.userId
+        const userId = await resolveAuthUserId(req)
 
-        const user = await User.findById(userId)
+        if (!userId) {
+            return res.json({ success: false, message: 'User Not Found' })
+        }
+
+        // Create user in MongoDB if Clerk webhook has not synced yet
+        const user = await ensureUserExists(userId)
 
         if (!user) {
             return res.json({ success: false, message: 'User Not Found' })
@@ -34,27 +41,42 @@ export const purchaseCourse = async (req, res) => {
         const { origin } = req.headers
 
 
-        const userId = req.auth.userId
+        const userId = await resolveAuthUserId(req)
 
         const courseData = await Course.findById(courseId)
-        const userData = await User.findById(userId)
+        const userData = await ensureUserExists(userId)
 
         if (!userData || !courseData) {
             return res.json({ success: false, message: 'Data Not Found' })
         }
 
+        const amountNumber = Number(
+            (courseData.coursePrice - courseData.discount * courseData.coursePrice / 100).toFixed(2)
+        )
+
+        const currency = process.env.CURRENCY.toLocaleLowerCase()
+        // Stripe requires checkout total to convert to at least ~$0.50 USD.
+        const minAmount = currency === 'inr' ? 50 : 0.5
+
+        if (amountNumber > 0 && amountNumber < minAmount) {
+            return res.json({
+                success: false,
+                message: currency === 'inr'
+                    ? `Stripe minimum is about ₹${minAmount}. Your course final price is ₹${amountNumber}. Please set price after discount to at least ₹${minAmount}.`
+                    : `Stripe minimum is $${minAmount}. Your course final price is $${amountNumber}. Please set price after discount to at least $${minAmount}.`
+            })
+        }
+
         const purchaseData = {
             courseId: courseData._id,
             userId,
-            amount: (courseData.coursePrice - courseData.discount * courseData.coursePrice / 100).toFixed(2),
+            amount: amountNumber.toFixed(2),
         }
 
         const newPurchase = await Purchase.create(purchaseData)
 
         // Stripe Gateway Initialize
         const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY)
-
-        const currency = process.env.CURRENCY.toLocaleLowerCase()
 
         // Creating line items to for Stripe
         const line_items = [{
@@ -63,13 +85,13 @@ export const purchaseCourse = async (req, res) => {
                 product_data: {
                     name: courseData.courseTitle
                 },
-                unit_amount: Math.floor(newPurchase.amount) * 100
+                unit_amount: Math.round(amountNumber * 100)
             },
             quantity: 1
         }]
 
         const session = await stripeInstance.checkout.sessions.create({
-            success_url: `${origin}/loading/my-enrollments`,
+            success_url: `${origin}/loading/my-enrollments?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${origin}/`,
             line_items: line_items,
             mode: 'payment',
@@ -86,17 +108,80 @@ export const purchaseCourse = async (req, res) => {
     }
 }
 
+// Confirm paid Stripe checkout and enroll user (works locally without Stripe webhook)
+export const confirmPurchase = async (req, res) => {
+    try {
+        const userId = await resolveAuthUserId(req)
+        if (!userId) {
+            return res.json({ success: false, message: 'User Not Found' })
+        }
+
+        const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY)
+        const { sessionId } = req.body || {}
+
+        if (sessionId) {
+            const session = await stripeInstance.checkout.sessions.retrieve(sessionId)
+
+            if (session.payment_status === 'paid' && session.metadata?.purchaseId) {
+                const purchase = await Purchase.findById(session.metadata.purchaseId)
+
+                if (purchase && purchase.userId === userId) {
+                    await completePurchaseEnrollment(purchase._id)
+                }
+            }
+        }
+
+        // Recover any pending purchases that Stripe already marked as paid
+        const pendingPurchases = await Purchase.find({ userId, status: 'pending' })
+
+        if (pendingPurchases.length > 0) {
+            const sessions = await stripeInstance.checkout.sessions.list({ limit: 40 })
+
+            for (const session of sessions.data) {
+                if (session.payment_status !== 'paid') continue
+
+                const purchaseId = session.metadata?.purchaseId
+                if (!purchaseId) continue
+
+                const matched = pendingPurchases.find(
+                    (purchase) => String(purchase._id) === String(purchaseId)
+                )
+
+                if (matched) {
+                    await completePurchaseEnrollment(matched._id)
+                }
+            }
+        }
+
+        res.json({ success: true, message: 'Enrollment confirmed' })
+    } catch (error) {
+        res.json({ success: false, message: error.message })
+    }
+}
+
 // Users Enrolled Courses With Lecture Links
 export const userEnrolledCourses = async (req, res) => {
 
     try {
 
-        const userId = req.auth.userId
+        const userId = await resolveAuthUserId(req)
 
-        const userData = await User.findById(userId)
-            .populate('enrolledCourses')
+        if (!userId) {
+            return res.json({ success: false, message: 'User Not Found' })
+        }
 
-        res.json({ success: true, enrolledCourses: userData.enrolledCourses })
+        const userData = await ensureUserExists(userId)
+
+        if (!userData) {
+            return res.json({ success: false, message: 'User Not Found' })
+        }
+
+        await userData.populate('enrolledCourses')
+
+        res.json({
+            success: true,
+            enrolledCourses: userData.enrolledCourses || []
+        })
 
     } catch (error) {
         res.json({ success: false, message: error.message })
@@ -109,7 +194,7 @@ export const updateUserCourseProgress = async (req, res) => {
 
     try {
 
-        const userId = req.auth.userId
+        const userId = await resolveAuthUserId(req)
 
         const { courseId, lectureId } = req.body
 
@@ -147,7 +232,7 @@ export const getUserCourseProgress = async (req, res) => {
 
     try {
 
-        const userId = req.auth.userId
+        const userId = await resolveAuthUserId(req)
 
         const { courseId } = req.body
 
@@ -164,7 +249,7 @@ export const getUserCourseProgress = async (req, res) => {
 // Add User Ratings to Course
 export const addUserRating = async (req, res) => {
 
-    const userId = req.auth.userId;
+    const userId = await resolveAuthUserId(req);
     const { courseId, rating } = req.body;
 
     // Validate inputs

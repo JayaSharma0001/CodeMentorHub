@@ -40,7 +40,12 @@ app.use(
     credentials: true,
   })
 );
-app.use(clerkMiddleware());
+app.use(
+  clerkMiddleware({
+    // SPA + JSON API: handshake redirects break Bearer token auth from the React app.
+    enableHandshake: false,
+  })
+);
 
 // Routes
 app.get("/", (req, res) => res.send("API Working"));

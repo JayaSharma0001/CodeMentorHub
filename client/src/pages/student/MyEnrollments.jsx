@@ -48,9 +48,27 @@ const MyEnrollments = () => {
   };
 
   useEffect(() => {
-    if (userData) {
+    const loadEnrollments = async () => {
+      if (!userData) return;
+
+      try {
+        const token = await getToken();
+        if (token) {
+          // Complete any paid purchases that webhook could not reach locally
+          await axios.post(
+            `${backendUrl}/api/user/confirm-purchase`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+        }
+      } catch (error) {
+        console.error(error);
+      }
+
       fetchUserEnrolledCourses();
-    }
+    };
+
+    loadEnrollments();
   }, [userData]);
 
   useEffect(() => {

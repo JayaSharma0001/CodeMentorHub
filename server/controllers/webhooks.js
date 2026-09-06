@@ -2,7 +2,7 @@ import { Webhook } from "svix";
 import User from "../models/User.js";
 import stripe from "stripe";
 import { Purchase } from "../models/Purchase.js";
-import Course from "../models/Course.js";
+import completePurchaseEnrollment from "../utils/completePurchaseEnrollment.js";
 
 
 
@@ -79,11 +79,18 @@ export const stripeWebhooks = async (request, response) => {
     event = stripeInstance.webhooks.constructEvent(request.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   }
   catch (err) {
-    response.status(400).send(`Webhook Error: ${err.message}`);
+    return response.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   // Handle the event
   switch (event.type) {
+    case 'checkout.session.completed': {
+      const session = event.data.object;
+      if (session.payment_status === 'paid' && session.metadata?.purchaseId) {
+        await completePurchaseEnrollment(session.metadata.purchaseId);
+      }
+      break;
+    }
     case 'payment_intent.succeeded': {
 
       const paymentIntent = event.data.object;
@@ -95,19 +102,7 @@ export const stripeWebhooks = async (request, response) => {
       });
 
       const { purchaseId } = session.data[0].metadata;
-
-      const purchaseData = await Purchase.findById(purchaseId)
-      const userData = await User.findById(purchaseData.userId)
-      const courseData = await Course.findById(purchaseData.courseId.toString())
-
-      courseData.enrolledStudents.push(userData)
-      await courseData.save()
-
-      userData.enrolledCourses.push(courseData._id)
-      await userData.save()
-
-      purchaseData.status = 'completed'
-      await purchaseData.save()
+      await completePurchaseEnrollment(purchaseId);
 
       break;
     }

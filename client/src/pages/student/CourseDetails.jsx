@@ -7,7 +7,7 @@ import { AppContext } from '../../context/AppContext';
 import { toast } from 'react-toastify';
 import humanizeDuration from 'humanize-duration'
 import YouTube from 'react-youtube';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import Loading from '../../components/student/Loading';
 
 const getYouTubeVideoId = (url = '') => {
@@ -49,8 +49,9 @@ const CourseDetails = () => {
   const [playerData, setPlayerData] = useState(null)
   const [isAlreadyEnrolled, setIsAlreadyEnrolled] = useState(false)
 
-  const { backendUrl, currency, userData, calculateChapterTime, calculateCourseDuration, calculateRating, calculateNoOfLectures } = useContext(AppContext)
+  const { backendUrl, currency, userData, fetchUserData, calculateChapterTime, calculateCourseDuration, calculateRating, calculateNoOfLectures } = useContext(AppContext)
   const { getToken } = useAuth()
+  const { user } = useUser()
 
 
   const fetchCourseData = async () => {
@@ -87,7 +88,8 @@ const CourseDetails = () => {
 
     try {
 
-      if (!userData) {
+      // Navbar uses Clerk user; enroll must use the same login check
+      if (!user) {
         return toast.warn('Login to Enroll')
       }
 
@@ -96,6 +98,14 @@ const CourseDetails = () => {
       }
 
       const token = await getToken();
+      if (!token) {
+        return toast.warn('Login to Enroll')
+      }
+
+      // Sync MongoDB user if AppContext userData is not ready yet
+      if (!userData) {
+        await fetchUserData()
+      }
 
       const { data } = await axios.post(backendUrl + '/api/user/purchase',
         { courseId: courseData._id },
@@ -121,7 +131,11 @@ const CourseDetails = () => {
   useEffect(() => {
 
     if (userData && courseData) {
-      setIsAlreadyEnrolled(userData.enrolledCourses.includes(courseData._id))
+      setIsAlreadyEnrolled(
+        (userData.enrolledCourses || []).some(
+          (courseId) => String(courseId) === String(courseData._id)
+        )
+      )
     }
 
   }, [userData, courseData])
@@ -150,7 +164,7 @@ const CourseDetails = () => {
             <p>{courseData.enrolledStudents.length} {courseData.enrolledStudents.length > 1 ? 'students' : 'student'}</p>
           </div>
 
-          <p className='text-sm'>Course by <span className='text-blue-600 underline'>{courseData.educator.name}</span></p>
+          <p className='text-sm'>Course by <span className='text-blue-600 underline'>{courseData.educator?.name || 'Educator'}</span></p>
 
           <div className="pt-8 text-gray-800">
             <h2 className="text-xl font-semibold">Course Structure</h2>
@@ -214,7 +228,7 @@ const CourseDetails = () => {
           {
             playerData
               ? <YouTube videoId={playerData.videoId} opts={{ playerVars: { autoplay: 1 } }} iframeClassName='w-full aspect-video' />
-              : <img src={courseData.courseThumbnail} alt="" />
+              : <img className="w-full max-w-full block object-cover" src={courseData.courseThumbnail} alt="" />
           }
           <div className="p-5">
             <div className="flex items-center gap-2">
